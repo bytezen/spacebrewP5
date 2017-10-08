@@ -65,7 +65,9 @@ public class Spacebrew {
 	private Integer		port = 9000;
 
 	private PApplet     parent;
-	private Method      onRangeMessageMethod, onStringMessageMethod, onBooleanMessageMethod, onOtherMessageMethod, onCustomMessageMethod, onOpenMethod, onCloseMethod;
+	private Method      onRangeMessageMethod, onStringMessageMethod, onBooleanMessageMethod,
+						onOtherMessageMethod, onCustomMessageMethod, onOpenMethod, onCloseMethod,
+						onUnknownMessageMethod;
 	private WsClient    wsClient;
 	private boolean     connectionEstablished = false;
 	private boolean     connectionRequested = false;
@@ -135,6 +137,12 @@ public class Spacebrew {
 		} catch (Exception e){
 			// System.out.println("no onSbClose method implemented");
 		}    
+
+		try {
+			onUnknownMessageMethod = parent.getClass().getMethod("onUnknownMessage", new Class[]{String.class});
+		} catch (Exception e){
+			// System.out.println("no onSbClose method implemented");
+		} 
 	}
 
 	/**
@@ -498,6 +506,28 @@ public class Spacebrew {
 		this.send( messageName, type, value );
 	}
 
+	/**
+	 * Send a String message directly to the server if it is connected
+	 * @param {String} What you're sending
+	 */
+	public void send( String message){
+		// String type = "string";
+		// for ( int i = 0, len = publishes.size(); i<len; i++ ){
+		// 	SpacebrewMessage m = publishes.get(i);
+		// 	if ( m.name.equals(messageName) ) { 
+		// 		type = m.type;
+		// 		break;
+		// 	}
+		// }
+		System.out.println("[send] trying to send message... " + message );
+		if ( connectionEstablished ) {
+			System.out.println("... [send] sending message: " + message );
+			wsClient.send( message);//sM.toString() );
+		} else {
+			System.err.println("[send] can't send message, not currently connected!");
+		} 
+	}
+
 	public boolean connected() {
 		return connectionEstablished;  
 	}
@@ -543,7 +573,46 @@ public class Spacebrew {
 	 * Websocket callback (don't call this please!)
 	 */
 	public void onMessage( String message ){
-		JSONObject m = new JSONObject( message ).getJSONObject("message");
+		parent.println("[ MSG*** ] " + message);
+		// This is a hack because the server sends different types of messages
+		//TODO: server should send consistent formatted messages
+		JSONObject jsObj = null;
+		JSONArray  jsArr = null;
+
+		try {
+			jsArr = new JSONArray(message);
+		} catch ( Exception e ) {
+			try {
+				jsObj = new JSONObject(message);
+			} catch ( Exception f ) {
+				System.out.println("[onMessage] parsing message as array and object failed: " + message);
+			}
+		}
+
+		if( jsArr != null ) {
+			System.out.println("we are going to skip out here and process the array");
+			return;
+		}
+
+
+		JSONObject m = jsObj.getJSONObject("message");
+		// JSONObject m = new JSONObject( message ).getJSONObject("message");
+
+		//admin messages are not formatted consistently
+		//TODO: server should send consistent formatted messages
+		if(m == null) {
+			if( onUnknownMessageMethod != null ) {
+				try {
+					System.out.println("[onUnknownMessageMethod] is attempting to invoke");
+					onUnknownMessageMethod.invoke( parent, jsObj.toString());
+
+				} catch ( Exception e ) {
+	
+				}
+			}
+
+			return;
+		}
 
 		String name = m.getString("name");
 		String type = m.getString("type");
@@ -664,6 +733,14 @@ public class Spacebrew {
 					} catch( Exception e){
 						System.err.println("[onOtherMessageMethod] invoke failed, disabling :(");
 						onOtherMessageMethod = null;
+					}
+				}
+				//this is the last resort--admin type messages should flow here
+				if ( onUnknownMessageMethod != null ){
+					try {
+						System.out.println("[onUnknownMessageMethod] is attempting to invoke");
+						onUnknownMessageMethod.invoke( parent, jsObj.toString());
+					} catch ( Exception e){
 					}
 				}
 			}

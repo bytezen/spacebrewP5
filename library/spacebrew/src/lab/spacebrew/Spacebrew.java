@@ -573,7 +573,7 @@ public class Spacebrew {
 	 * Websocket callback (don't call this please!)
 	 */
 	public void onMessage( String message ){
-		parent.println("[ MSG*** ] " + message);
+		// parent.println("[ MSG*** ] " + message);
 		// This is a hack because the server sends different types of messages
 		//TODO: server should send consistent formatted messages
 		JSONObject jsObj = null;
@@ -590,20 +590,28 @@ public class Spacebrew {
 		}
 
 		if( jsArr != null ) {
-			System.out.println("we are going to skip out here and process the array");
+			// System.out.println("we are going to skip out here and process the array");
+			if( onUnknownMessageMethod != null ) {
+				try {
+					// System.out.println("[onUnknownMessageMethod] is attempting to invoke");
+					onUnknownMessageMethod.invoke( parent, jsArr.toString());
+
+				} catch ( Exception e ) {
+	
+				}
+			}			
 			return;
 		}
 
 
-		JSONObject m = jsObj.getJSONObject("message");
 		// JSONObject m = new JSONObject( message ).getJSONObject("message");
 
 		//admin messages are not formatted consistently
 		//TODO: server should send consistent formatted messages
-		if(m == null) {
+		if( !jsObj.has("message") ){ //m == null) {
 			if( onUnknownMessageMethod != null ) {
 				try {
-					System.out.println("[onUnknownMessageMethod] is attempting to invoke");
+					// System.out.println("[onUnknownMessageMethod] is attempting to invoke");
 					onUnknownMessageMethod.invoke( parent, jsObj.toString());
 
 				} catch ( Exception e ) {
@@ -613,6 +621,7 @@ public class Spacebrew {
 
 			return;
 		}
+		JSONObject m = jsObj.getJSONObject("message");
 
 		String name = m.getString("name");
 		String type = m.getString("type");

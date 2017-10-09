@@ -2,4 +2,7 @@
 */.DS_Store
 *.svn
 */.svn
-.svn/entries
+.svn/entries.DS_Store
+distribution*
+*.class
+DS_Store
